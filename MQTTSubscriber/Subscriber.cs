@@ -11,54 +11,62 @@ namespace MQTTSubscriber
 {
     class Subscriber
     {
-        public static object Ecoding { get; private set; }
-
-        [Obsolete]
         static async Task Main(string[] args)
         {
             var mqttFactory = new MqttFactory();
             IMqttClient client = mqttFactory.CreateMqttClient();
             var options = new MqttClientOptionsBuilder()
-                            .WithClientId(Guid.NewGuid().ToString())
-                            .WithTcpServer("localhost", 1883)
-                            .WithCleanSession()
-                            .Build();
-
+                        .WithClientId(Guid.NewGuid().ToString())
+                        .WithTcpServer("localhost", 1883)
+                        .WithCleanSession()
+                        .Build();
             client.UseConnectedHandler(async e =>
             {
-                Console.WriteLine("Conexão do broker foi um sucesso!");
-                var topicFilter = new TopicFilterBuilder()
-                                        .WithTopic("Maria")
-                                        .Build();
-               await client.SubscribeAsync(topicFilter);
+                Console.WriteLine("Conectado ao broker com sucesso ");
+                var topicFilter = new TopicFilterBuilder()  
+                            .WithTopic("Maria")
+                            .Build();
+
+                await client.SubscribeAsync(topicFilter); 
             });
+
             client.UseDisconnectedHandler(e =>
             {
-                Console.WriteLine("O broker foi desconectado");
+                Console.WriteLine("Desconectado do broker com sucesso");
             });
 
             client.UseApplicationMessageReceivedHandler(async e => 
             {
-                var texto = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
-                Console.WriteLine($"Received message - {texto}");
                 
-                if (!string.IsNullOrEmpty(texto))
+                Console.WriteLine($"mensagem recebida {Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}\n");
+                var enviar = Encoding.UTF8.GetString(e.ApplicationMessage.Payload);
+                if(enviar!=null)  
                 {
                     var httpCliente = new HttpClient();
-                    var objeto = new { texto = texto };
-                    var json = JsonConvert.SerializeObject(objeto);
-                    var content = new StringContent(json, Encoding.UTF8, "application/json");
-                    var response = await httpCliente.PostAsync("https://localhost:44326/v1/mensagem", content);
+                    var objeto = new { mensagem = enviar };
+                    var content = ToRequest(objeto);
+                    var response = await httpCliente.PostAsync("https://localhost:44326/v1/MensagemBroker", content);
 
                 }
+
             });
 
+            
             await client.ConnectAsync(options);
 
-            Console.WriteLine("Por favor digite uma chave para ser exibida ");
             Console.ReadLine();
 
-            await client.DisconnectAsync();
+            //await client.DisconnectAsync();
+
+
+        }
+
+  
+        private static StringContent ToRequest(object obj) // metodo para serealizar em json
+        {
+            var json = JsonConvert.SerializeObject(obj);
+            var data = new StringContent(json, Encoding.UTF8, "application/json");
+            return data;
         }
     }
 }
